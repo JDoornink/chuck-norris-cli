@@ -1,0 +1,9 @@
+auth:
+  audience: "Audience Value"
+  disabled: true
+  engine_url: "http://localhost:8181"
+  issuer: "https://viewpointid.development.vpplatdev.trimble.com"
+
+# PORT: 3000
+# MONGO_URI: mongodb+srv://nemo0:HjjjYEGDHJ@certified.dmht2u.mongodb.net/myFirstDatabase?retryWrites=true&w=majority
+# API_SECRET: Y1VFGSea2EPa6v3gFY84swUJbZCHY8WEzKfdq6uPUyRjYR
