@@ -1,4 +1,4 @@
-name: Deploy To Environment
+name: Deploy To PRODUCTION Environment
 
 on:
   workflow_dispatch:
