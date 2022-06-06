@@ -1,0 +1,91 @@
+name: Deploy To Environment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'The target environment [dev, test, stage, prod] (default: prod)'
+        required: true
+        default: 'prod'
+      region:
+        description: 'The target region [us-central] (default: us-central)'
+        required: true
+        default: 'us-central'
+
+env:
+  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  HELM_VERSION_TO_INSTALL: 3.5.0 # version of HELM to install
+  IMAGE_REPOSITORY: vpcore.azurecr.io/orchestration-core/core-ifx-api-gateway
+  HELM_CHART_PATH: ./provisioning/helm/core-ifx-api-gateway
+
+  HELM_CHART_VALUES_PRODUCTION_US: ./provisioning/helm/core-ifx-api-gateway/values/values-production-us.yaml
+  AKS_CLUSTER_NAME_PRODUCTION_US: orchestration-core-prod
+  AKS_CLUSTER_RESOURCE_GROUP_PRODUCTION_US: orchestration-core-us-central-prod
+  VERSION: 0.0.1
+
+jobs:
+  echo_environment_and_region:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "Commit Hash: ${{ github.sha }}"
+          echo "Environment: ${{ github.event.inputs.environment }}"
+          echo "Region: ${{ github.event.inputs.region }}"
+
+      - uses: act10ns/slack@v1
+        with:
+          status: deploy to environment awaiting approval
+        if: success()
+
+  deploy_to_environment:
+    name: Deploy to Environment
+    runs-on: ubuntu-latest
+    needs: echo_environment_and_region
+
+    environment: develop
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Azure Login
+        uses: Azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS_PROD }}
+
+      - name: Debug Dump
+        uses: hmarr/debug-action@v2
+
+
+      - name: Helm tool installer
+        uses: azure/setup-helm@v1
+        with:
+          version: ${{ env.HELM_VERSION_TO_INSTALL }}
+        id: install
+
+      # - name: Azure kubernetes set context.
+      #   uses: Azure/aks-set-context@v1
+      #   with:
+      #     creds: '${{ secrets.AZURE_CREDENTIALS_PROD }}'
+      #     cluster-name: "${{ env.AKS_CLUSTER_NAME_PRODUCTION_US }}"
+      #     resource-group: "${{ env.AKS_CLUSTER_RESOURCE_GROUP_PRODUCTION_US }}"
+
+      - name: Display Items
+        shell: pwsh
+        run: |
+          Get-ChildItem -Recurse
+
+      - run: echo ${{ steps.commonSecrets.outputs.container-registry-service-principal-pull-only-username }}
+
+      # Below will Deploy to k8s cluster if one existed.
+      # - name: Deploy to kubernetes
+      #   shell: bash
+      #   run: |
+      #     helm upgrade core-ifx-api-gateway ${{ env.HELM_CHART_PATH }} --values ${{ env.HELM_CHART_VALUES_PRODUCTION_US }} --debug --install --wait --timeout 100s \
+      #     --set annotations.releaseName=${{ github.run_id }} \
+      #     --set annotations.releaseAttempt=${{ github.run_number }} \
+      #     --set image.repository=${{ env.IMAGE_REPOSITORY }} \
+      #     --set image.tag=${{env.VERSION}}.${{ github.sha }} \
+      #     --set image.imagePullSecret.username=${{ steps.commonSecrets.outputs.container-registry-service-principal-pull-only-username }} \
+      #     --set image.imagePullSecret.password=${{ steps.commonSecrets.outputs.container-registry-service-principal-pull-only-password }}
